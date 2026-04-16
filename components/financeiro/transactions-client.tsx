@@ -22,7 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TransactionDialog } from "./transaction-dialog"
-import { Plus, Search, CheckCircle2, Circle } from "lucide-react"
+import { Plus, Search, CheckCircle2, Circle, Trash2, CheckCheck, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -32,14 +32,6 @@ type Props = {
   businessUnits: Pick<BusinessUnit, "id" | "name" | "slug">[]
   categories: Pick<TransactionCategory, "id" | "name" | "type">[]
   bankAccounts: Pick<BankAccount, "id" | "bank_name">[]
-}
-
-const categoryTypeLabels: Record<string, string> = {
-  receita: "Receita",
-  custo_direto: "Custo direto",
-  despesa_operacional: "Despesa op.",
-  deducao: "Dedução",
-  investimento: "Investimento",
 }
 
 export function TransactionsClient({
@@ -55,6 +47,8 @@ export function TransactionsClient({
   const [filterBu, setFilterBu] = useState<string>("all")
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
 
   const filtered = initialTransactions.filter((t) => {
     const matchSearch =
@@ -65,6 +59,39 @@ export function TransactionsClient({
     const matchBu = filterBu === "all" || t.business_unit_id === filterBu
     return matchSearch && matchType && matchBu
   })
+
+  const filteredIds = filtered.map((t) => t.id)
+  const allSelected = filteredIds.length > 0 && filteredIds.every((id) => selected.has(id))
+  const someSelected = filteredIds.some((id) => selected.has(id))
+  const selectedInView = filteredIds.filter((id) => selected.has(id))
+
+  function toggleAll() {
+    if (allSelected) {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        filteredIds.forEach((id) => next.delete(id))
+        return next
+      })
+    } else {
+      setSelected((prev) => {
+        const next = new Set(prev)
+        filteredIds.forEach((id) => next.add(id))
+        return next
+      })
+    }
+  }
+
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelected(new Set())
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Excluir este lançamento?")) return
@@ -79,8 +106,30 @@ export function TransactionsClient({
     startTransition(() => router.refresh())
   }
 
+  async function handleBulkDelete() {
+    if (selectedInView.length === 0) return
+    if (!confirm(`Excluir ${selectedInView.length} lançamento(s)?`)) return
+    setBulkLoading(true)
+    const supabase = createClient()
+    await supabase.from("transactions").delete().in("id", selectedInView)
+    clearSelection()
+    setBulkLoading(false)
+    startTransition(() => router.refresh())
+  }
+
+  async function handleBulkReconcile() {
+    if (selectedInView.length === 0) return
+    setBulkLoading(true)
+    const supabase = createClient()
+    await supabase.from("transactions").update({ is_reconciled: true }).in("id", selectedInView)
+    clearSelection()
+    setBulkLoading(false)
+    startTransition(() => router.refresh())
+  }
+
   return (
     <div className="space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Lançamentos</h1>
@@ -135,11 +184,61 @@ export function TransactionsClient({
         </Select>
       </div>
 
+      {/* Barra de ações em bulk */}
+      {someSelected && (
+        <div className="flex items-center gap-3 px-3 py-2 rounded-lg border bg-muted/50 text-sm">
+          <span className="font-medium">{selectedInView.length} selecionado(s)</span>
+          <div className="h-4 w-px bg-border" />
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5"
+            disabled={bulkLoading}
+            onClick={handleBulkReconcile}
+          >
+            <CheckCheck className="h-3.5 w-3.5" />
+            Marcar como conciliado
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5 text-rose-600 hover:text-rose-600 border-rose-200 hover:border-rose-300 hover:bg-rose-50"
+            disabled={bulkLoading}
+            onClick={handleBulkDelete}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Excluir
+          </Button>
+          <button
+            className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={clearSelection}
+          >
+            Limpar seleção
+          </button>
+        </div>
+      )}
+
       {/* Tabela */}
       <div className="border rounded-lg overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
+              {/* Checkbox selecionar todos */}
+              <TableHead className="w-10 px-3">
+                <button
+                  onClick={toggleAll}
+                  className="flex items-center justify-center w-4 h-4"
+                  title={allSelected ? "Desmarcar todos" : "Selecionar todos"}
+                >
+                  {allSelected ? (
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                  ) : someSelected ? (
+                    <Minus className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <Circle className="h-4 w-4 text-muted-foreground/50" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead className="w-8"></TableHead>
               <TableHead>Data</TableHead>
               <TableHead>Descrição</TableHead>
@@ -153,78 +252,100 @@ export function TransactionsClient({
           <TableBody>
             {filtered.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-12">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-12">
                   Nenhum lançamento encontrado.
                 </TableCell>
               </TableRow>
             )}
-            {filtered.map((t) => (
-              <TableRow key={t.id} className="group">
-                <TableCell>
-                  <button
-                    onClick={() => handleReconcile(t.id, t.is_reconciled)}
-                    className="text-muted-foreground hover:text-emerald-600 transition-colors"
-                    title={t.is_reconciled ? "Conciliado" : "Marcar como conciliado"}
-                  >
-                    {t.is_reconciled
-                      ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      : <Circle className="h-4 w-4" />
-                    }
-                  </button>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                  {formatDate(t.transaction_date)}
-                </TableCell>
-                <TableCell>
-                  <p className="font-medium text-sm">{t.description}</p>
-                  {t.counterpart_name && (
-                    <p className="text-xs text-muted-foreground">{t.counterpart_name}</p>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className="text-xs">
-                    {(t.business_units as any)?.name ?? "—"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {(t.transaction_categories as any)?.name ?? "—"}
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {(t.bank_accounts as any)?.bank_name ?? "—"}
-                </TableCell>
-                <TableCell className="text-right font-mono font-medium text-sm">
-                  <span className={cn(
-                    t.type === "entrada" ? "text-emerald-600" : "text-rose-600"
-                  )}>
-                    {t.type === "entrada" ? "+" : "-"}
-                    {formatCurrency(t.amount)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => {
-                        setEditingTransaction(t)
-                        setDialogOpen(true)
-                      }}
+            {filtered.map((t) => {
+              const isSelected = selected.has(t.id)
+              return (
+                <TableRow
+                  key={t.id}
+                  className={cn("group", isSelected && "bg-muted/40")}
+                >
+                  {/* Checkbox individual */}
+                  <TableCell className="px-3">
+                    <button
+                      onClick={() => toggleOne(t.id)}
+                      className="flex items-center justify-center w-4 h-4"
                     >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs text-rose-600 hover:text-rose-600"
-                      onClick={() => handleDelete(t.id)}
+                      {isSelected ? (
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
+                      )}
+                    </button>
+                  </TableCell>
+
+                  {/* Conciliação */}
+                  <TableCell>
+                    <button
+                      onClick={() => handleReconcile(t.id, t.is_reconciled)}
+                      className="text-muted-foreground hover:text-emerald-600 transition-colors"
+                      title={t.is_reconciled ? "Conciliado" : "Marcar como conciliado"}
                     >
-                      Excluir
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                      {t.is_reconciled
+                        ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        : <Circle className="h-4 w-4" />
+                      }
+                    </button>
+                  </TableCell>
+
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {formatDate(t.transaction_date)}
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium text-sm">{t.description}</p>
+                    {t.counterpart_name && (
+                      <p className="text-xs text-muted-foreground">{t.counterpart_name}</p>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="text-xs">
+                      {(t.business_units as any)?.name ?? "—"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {(t.transaction_categories as any)?.name ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {(t.bank_accounts as any)?.bank_name ?? "—"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-medium text-sm">
+                    <span className={cn(
+                      t.type === "entrada" ? "text-emerald-600" : "text-rose-600"
+                    )}>
+                      {t.type === "entrada" ? "+" : "-"}
+                      {formatCurrency(t.amount)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => {
+                          setEditingTransaction(t)
+                          setDialogOpen(true)
+                        }}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs text-rose-600 hover:text-rose-600"
+                        onClick={() => handleDelete(t.id)}
+                      >
+                        Excluir
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )
+            })}
           </TableBody>
         </Table>
       </div>

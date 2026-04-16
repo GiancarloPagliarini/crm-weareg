@@ -9,6 +9,7 @@ import {
   FileBarChart2,
   Users,
   Receipt,
+  FileUp,
 } from "lucide-react"
 import {
   Sidebar,
@@ -48,6 +49,11 @@ const navItems = [
     title: "A Receber",
     href: "/financeiro/receber",
     icon: Receipt,
+  },
+  {
+    title: "Importar OFX",
+    href: "/financeiro/importar",
+    icon: FileUp,
   },
 ]
 
