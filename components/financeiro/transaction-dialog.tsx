@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select"
 import type { Transaction, BusinessUnit, TransactionCategory, BankAccount } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 
 type Props = {
   open: boolean
@@ -52,7 +53,7 @@ export function TransactionDialog({
 
   const today = new Date().toISOString().split("T")[0]
 
-  const [form, setForm] = useState({
+  const emptyForm = () => ({
     type: transaction?.type ?? "saida",
     amount: transaction?.amount?.toString() ?? "",
     description: transaction?.description ?? "",
@@ -65,8 +66,18 @@ export function TransactionDialog({
     notes: transaction?.notes ?? "",
   })
 
+  const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Reseta o form toda vez que o dialog abre (Base UI não chama onOpenChange ao abrir controlled)
+  useEffect(() => {
+    if (open) {
+      setForm(emptyForm())
+      setError(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   function handleField(field: string, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -76,12 +87,20 @@ export function TransactionDialog({
     e.preventDefault()
     setError(null)
 
+    if (!form.description.trim()) {
+      setError("Preencha a descrição.")
+      return
+    }
     if (!form.business_unit_id || !form.category_id || !form.bank_account_id) {
       setError("Preencha BU, categoria e conta bancária.")
       return
     }
 
-    const amount = parseFloat(form.amount.replace(",", "."))
+    const rawAmount = form.amount.trim()
+    // suporta formato BR (1.081,57) e US (1081.57)
+    const amount = rawAmount.includes(",")
+      ? parseFloat(rawAmount.replace(/\./g, "").replace(",", "."))
+      : parseFloat(rawAmount)
     if (isNaN(amount) || amount <= 0) {
       setError("Valor inválido.")
       return
@@ -93,7 +112,7 @@ export function TransactionDialog({
     const payload = {
       type: form.type,
       amount,
-      description: form.description,
+      description: form.description.trim(),
       business_unit_id: form.business_unit_id,
       category_id: form.category_id,
       bank_account_id: form.bank_account_id,
@@ -117,23 +136,7 @@ export function TransactionDialog({
     onSuccess()
   }
 
-  // Ao abrir o dialog, sincroniza o form com a transaction (ou reseta)
   function handleOpenChange(val: boolean) {
-    if (val) {
-      setForm({
-        type: transaction?.type ?? "saida",
-        amount: transaction?.amount?.toString() ?? "",
-        description: transaction?.description ?? "",
-        business_unit_id: transaction?.business_unit_id ?? "",
-        category_id: transaction?.category_id ?? "",
-        bank_account_id: transaction?.bank_account_id ?? "",
-        transaction_date: transaction?.transaction_date ?? today,
-        competence_date: transaction?.competence_date ?? today.slice(0, 7) + "-01",
-        counterpart_name: transaction?.counterpart_name ?? "",
-        notes: transaction?.notes ?? "",
-      })
-      setError(null)
-    }
     onOpenChange(val)
   }
 
@@ -143,15 +146,19 @@ export function TransactionDialog({
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar lançamento" : "Novo lançamento"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Tipo */}
+        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+
+          {/* Tipo + Valor */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select value={form.type} onValueChange={(v) => handleField("type", v ?? "saida")}>
-                <SelectTrigger>
+              <Select
+                value={form.type}
+                onValueChange={(v) => handleField("type", v ?? "saida")}
+              >
+                <SelectTrigger className="w-full">
                   <SelectValue>
-                    {(v: string) => v === "entrada" ? "Entrada" : "Saída"}
+                    {(v: string | null) => v === "entrada" ? "Entrada" : "Saída"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -166,7 +173,7 @@ export function TransactionDialog({
                 placeholder="0,00"
                 value={form.amount}
                 onChange={(e) => handleField("amount", e.target.value)}
-                required
+                inputMode="decimal"
               />
             </div>
           </div>
@@ -178,7 +185,6 @@ export function TransactionDialog({
               placeholder="Ex: Pagamento de editor"
               value={form.description}
               onChange={(e) => handleField("description", e.target.value)}
-              required
             />
           </div>
 
@@ -186,10 +192,13 @@ export function TransactionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Unidade de negócio</Label>
-              <Select value={form.business_unit_id} onValueChange={(v) => handleField("business_unit_id", v ?? "")}>
-                <SelectTrigger>
+              <Select
+                value={form.business_unit_id || null}
+                onValueChange={(v) => handleField("business_unit_id", v ?? "")}
+              >
+                <SelectTrigger className={cn("w-full", !form.business_unit_id && "text-muted-foreground")}>
                   <SelectValue placeholder="Selecionar...">
-                    {(v: string) => businessUnits.find((bu) => bu.id === v)?.name ?? "Selecionar..."}
+                    {(v: string | null) => v ? (businessUnits.find((bu) => bu.id === v)?.name ?? v) : "Selecionar..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -201,10 +210,13 @@ export function TransactionDialog({
             </div>
             <div className="space-y-1.5">
               <Label>Categoria</Label>
-              <Select value={form.category_id} onValueChange={(v) => handleField("category_id", v ?? "")}>
-                <SelectTrigger>
+              <Select
+                value={form.category_id || null}
+                onValueChange={(v) => handleField("category_id", v ?? "")}
+              >
+                <SelectTrigger className={cn("w-full", !form.category_id && "text-muted-foreground")}>
                   <SelectValue placeholder="Selecionar...">
-                    {(v: string) => categories.find((c) => c.id === v)?.name ?? "Selecionar..."}
+                    {(v: string | null) => v ? (categories.find((c) => c.id === v)?.name ?? v) : "Selecionar..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -225,10 +237,13 @@ export function TransactionDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Conta bancária</Label>
-              <Select value={form.bank_account_id} onValueChange={(v) => handleField("bank_account_id", v ?? "")}>
-                <SelectTrigger>
+              <Select
+                value={form.bank_account_id || null}
+                onValueChange={(v) => handleField("bank_account_id", v ?? "")}
+              >
+                <SelectTrigger className={cn("w-full", !form.bank_account_id && "text-muted-foreground")}>
                   <SelectValue placeholder="Selecionar...">
-                    {(v: string) => bankAccounts.find((b) => b.id === v)?.bank_name ?? "Selecionar..."}
+                    {(v: string | null) => v ? (bankAccounts.find((b) => b.id === v)?.bank_name ?? v) : "Selecionar..."}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -239,7 +254,7 @@ export function TransactionDialog({
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Contraparte</Label>
+              <Label>Contraparte <span className="text-muted-foreground text-xs">(opcional)</span></Label>
               <Input
                 placeholder="Ex: Meta Ads, Editor João"
                 value={form.counterpart_name}
@@ -256,23 +271,21 @@ export function TransactionDialog({
                 type="date"
                 value={form.transaction_date}
                 onChange={(e) => handleField("transaction_date", e.target.value)}
-                required
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Data de competência</Label>
+              <Label>Competência</Label>
               <Input
                 type="date"
                 value={form.competence_date}
                 onChange={(e) => handleField("competence_date", e.target.value)}
-                required
               />
             </div>
           </div>
 
           {/* Notas */}
           <div className="space-y-1.5">
-            <Label>Observações</Label>
+            <Label>Observações <span className="text-muted-foreground text-xs">(opcional)</span></Label>
             <Textarea
               placeholder="Observações opcionais..."
               value={form.notes}
@@ -282,15 +295,17 @@ export function TransactionDialog({
           </div>
 
           {error && (
-            <p className="text-sm text-rose-600">{error}</p>
+            <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2">
+              <p className="text-sm text-rose-700 font-medium">{error}</p>
+            </div>
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? "Salvando..." : isEdit ? "Salvar" : "Criar"}
+              {loading ? "Salvando..." : isEdit ? "Salvar alterações" : "Criar lançamento"}
             </Button>
           </div>
         </form>
