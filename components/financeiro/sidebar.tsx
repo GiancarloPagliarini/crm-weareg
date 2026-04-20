@@ -11,6 +11,7 @@ import {
   Receipt,
   FileUp,
 } from "lucide-react"
+import { LogoutButton } from "./logout-button"
 import {
   Sidebar,
   SidebarContent,
@@ -57,7 +58,9 @@ const navItems = [
   },
 ]
 
-export function FinanceiroSidebar() {
+type Props = { userEmail?: string }
+
+export function FinanceiroSidebar({ userEmail }: Props) {
   const pathname = usePathname()
 
   return (
@@ -98,8 +101,13 @@ export function FinanceiroSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="px-4 py-3">
-        <p className="text-xs text-muted-foreground">v1.0 — Fase 1</p>
+      <SidebarFooter className="px-4 py-3 space-y-2">
+        {userEmail && (
+          <p className="text-xs text-muted-foreground truncate" title={userEmail}>{userEmail}</p>
+        )}
+        <div className="flex items-center justify-between">
+          <LogoutButton />
+        </div>
       </SidebarFooter>
     </Sidebar>
   )
