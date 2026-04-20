@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "CRM WeAreG",
+  title: "Weareg - Financeiro",
   description: "Gestão financeira multi-BU",
 };
 
