@@ -74,11 +74,12 @@ function InlineSelect({
   return (
     <Select value={value} onValueChange={(v) => onChange(v ?? "")}>
       <SelectTrigger
+        size="sm"
         className={cn(
-          "h-7 text-xs border transition-all duration-150 w-full",
+          "w-full shadow-none",
           filled
             ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-            : "border-dashed border-muted-foreground/40 text-muted-foreground hover:border-muted-foreground/70 hover:bg-muted/40"
+            : "border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground hover:border-muted-foreground/70 hover:bg-muted/40"
         )}
       >
         <SelectValue>
