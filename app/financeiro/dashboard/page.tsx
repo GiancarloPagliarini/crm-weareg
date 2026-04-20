@@ -87,12 +87,14 @@ export default async function DashboardPage() {
           value={formatCurrency(kpis.lucro_bruto)}
           icon={TrendingUp}
           sub={formatPercent(kpis.margem_bruta)}
+          subValue={kpis.margem_bruta}
         />
         <KpiCard
           label="Lucro líquido"
           value={formatCurrency(kpis.lucro_liquido)}
           icon={TrendingUp}
           sub={formatPercent(kpis.margem_liquida)}
+          subValue={kpis.margem_liquida}
           highlight={kpis.lucro_liquido > 0 ? "positive" : kpis.lucro_liquido < 0 ? "negative" : undefined}
         />
         <KpiCard
@@ -110,7 +112,7 @@ export default async function DashboardPage() {
 
       {/* Contas bancárias */}
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground mb-3">Contas bancárias</h2>
+        <h2 className="text-sm font-semibold mb-3">Contas bancárias</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {(bankBalances as BankBalance[] ?? []).map((bank) => (
             <BankCard key={bank.id} bank={bank} />
@@ -123,7 +125,7 @@ export default async function DashboardPage() {
 
       {/* KPIs por BU */}
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground mb-3">Por unidade de negócio</h2>
+        <h2 className="text-sm font-semibold mb-3">Por unidade de negócio</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           {buKpis.map(({ bu, kpis: buKpi }) => (
             <BuCard key={bu.id} bu={bu} kpis={buKpi} />
