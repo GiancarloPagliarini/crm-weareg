@@ -10,8 +10,10 @@ import {
   Users,
   Receipt,
   FileUp,
+  Wallet,
 } from "lucide-react"
 import { LogoutButton } from "./logout-button"
+import { ThemeToggle } from "./theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -50,6 +52,11 @@ const navItems = [
     title: "A Receber",
     href: "/financeiro/receber",
     icon: Receipt,
+  },
+  {
+    title: "Central de Custo",
+    href: "/financeiro/central-custo",
+    icon: Wallet,
   },
   {
     title: "Importar OFX",
@@ -105,8 +112,9 @@ export function FinanceiroSidebar({ userEmail }: Props) {
         {userEmail && (
           <p className="text-xs text-muted-foreground truncate" title={userEmail}>{userEmail}</p>
         )}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <LogoutButton />
+          <ThemeToggle />
         </div>
       </SidebarFooter>
     </Sidebar>

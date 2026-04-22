@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { formatCurrency, formatDate } from "@/lib/formatters"
+import { TRACKING_START_DATE } from "@/lib/constants"
 import type { Receivable } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,6 +34,7 @@ export default async function ReceberPage() {
   const { data: receivables } = await supabase
     .from("receivables")
     .select("*, business_units(name)")
+    .gte("created_at", TRACKING_START_DATE)
     .order("due_date", { ascending: true })
 
   const items = (receivables ?? []) as (Receivable & { business_units: { name: string } | null })[]

@@ -1,3 +1,5 @@
+import { TRACKING_START_DATE } from './constants'
+
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -24,8 +26,9 @@ export function currentMonthRange(): { start: string; end: string } {
   const now = new Date()
   const start = new Date(now.getFullYear(), now.getMonth(), 1)
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+  const startStr = start.toISOString().split('T')[0]
   return {
-    start: start.toISOString().split('T')[0],
+    start: startStr < TRACKING_START_DATE ? TRACKING_START_DATE : startStr,
     end: end.toISOString().split('T')[0],
   }
 }

@@ -13,6 +13,7 @@ type ImportTransaction = {
   counterpart_name?: string | null
   notes?: string | null
   fitid?: string | null
+  cost_rule_id?: string | null
 }
 
 export async function POST(req: NextRequest) {

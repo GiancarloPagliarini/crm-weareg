@@ -4,7 +4,7 @@ import { useState, useRef, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { parseOFX } from "@/lib/ofx-parser"
 import { formatCurrency, formatDate } from "@/lib/formatters"
-import type { BusinessUnit, TransactionCategory, BankAccount } from "@/lib/types"
+import type { BusinessUnit, TransactionCategory, BankAccount, CostFrequency } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -23,18 +23,29 @@ import {
   ChevronRight,
   ArrowRight,
   Minus,
+  Sparkles,
 } from "lucide-react"
+
+export type CostRuleMatcher = {
+  id: string
+  match_text: string
+  business_unit_id: string
+  category_id: string
+  frequency: CostFrequency
+}
 
 type Props = {
   businessUnits: Pick<BusinessUnit, "id" | "name">[]
   categories: Pick<TransactionCategory, "id" | "name" | "type">[]
   bankAccounts: Pick<BankAccount, "id" | "bank_name">[]
+  costRules: CostRuleMatcher[]
 }
 
 type RowConfig = {
   skip: boolean
   business_unit_id: string
   category_id: string
+  cost_rule_id: string | null
 }
 
 const categoryTypeLabels: Record<string, string> = {
@@ -46,11 +57,11 @@ const categoryTypeLabels: Record<string, string> = {
 }
 
 const categoryTypeColors: Record<string, string> = {
-  receita: "text-emerald-600",
-  custo_direto: "text-rose-500",
-  despesa_operacional: "text-amber-600",
-  deducao: "text-orange-500",
-  investimento: "text-blue-500",
+  receita: "text-emerald-600 dark:text-emerald-400",
+  custo_direto: "text-rose-500 dark:text-rose-400",
+  despesa_operacional: "text-amber-600 dark:text-amber-400",
+  deducao: "text-orange-500 dark:text-orange-400",
+  investimento: "text-blue-500 dark:text-blue-400",
 }
 
 // ── Select compacto para uso dentro da tabela ────────────────
@@ -78,7 +89,7 @@ function InlineSelect({
         className={cn(
           "w-full shadow-none",
           filled
-            ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+            ? "border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-950/60"
             : "border-dashed border-muted-foreground/40 bg-transparent text-muted-foreground hover:border-muted-foreground/70 hover:bg-muted/40"
         )}
       >
@@ -123,9 +134,9 @@ const INSTITUTION_CONFIG: Record<Institution, {
 }> = {
   c6: {
     label: "C6 Bank",
-    color: "text-yellow-700",
-    borderColor: "border-yellow-300",
-    bgColor: "bg-yellow-50",
+    color: "text-yellow-700 dark:text-yellow-300",
+    borderColor: "border-yellow-300 dark:border-yellow-700",
+    bgColor: "bg-yellow-50 dark:bg-yellow-950/40",
     steps: [
       "Acesse o Internet Banking do C6",
       "Vá em Extrato → Exportar",
@@ -135,9 +146,9 @@ const INSTITUTION_CONFIG: Record<Institution, {
   },
   santander: {
     label: "Santander",
-    color: "text-red-700",
-    borderColor: "border-red-200",
-    bgColor: "bg-red-50",
+    color: "text-red-700 dark:text-red-300",
+    borderColor: "border-red-200 dark:border-red-800",
+    bgColor: "bg-red-50 dark:bg-red-950/40",
     steps: [
       "Acesse o Internet Banking do Santander",
       "Vá em Conta → Extrato",
@@ -147,7 +158,16 @@ const INSTITUTION_CONFIG: Record<Institution, {
   },
 }
 
-export function OFXImportClient({ businessUnits, categories, bankAccounts }: Props) {
+function matchRule(description: string, rules: CostRuleMatcher[]): CostRuleMatcher | null {
+  if (!description) return null
+  const haystack = description.toUpperCase()
+  for (const r of rules) {
+    if (r.match_text && haystack.includes(r.match_text.toUpperCase())) return r
+  }
+  return null
+}
+
+export function OFXImportClient({ businessUnits, categories, bankAccounts, costRules }: Props) {
   const router = useRouter()
   const [, startTransition] = useTransition()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -184,8 +204,11 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
       const result = parseOFX(content)
       setParsed(result)
       const configs: Record<number, RowConfig> = {}
-      result.transactions.forEach((_, i) => {
-        configs[i] = { skip: false, business_unit_id: "", category_id: "" }
+      result.transactions.forEach((t, i) => {
+        const rule = matchRule(t.memo, costRules)
+        configs[i] = rule
+          ? { skip: false, business_unit_id: rule.business_unit_id, category_id: rule.category_id, cost_rule_id: rule.id }
+          : { skip: false, business_unit_id: "", category_id: "", cost_rule_id: null }
       })
       setRowConfigs(configs)
       setStep(2)
@@ -194,14 +217,19 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
   }
 
   function getRowConfig(i: number): RowConfig {
-    return rowConfigs[i] ?? { skip: false, business_unit_id: "", category_id: "" }
+    return rowConfigs[i] ?? { skip: false, business_unit_id: "", category_id: "", cost_rule_id: null }
   }
 
-  function setRowField(i: number, field: keyof RowConfig, value: string | boolean) {
-    setRowConfigs((prev) => ({
-      ...prev,
-      [i]: { ...getRowConfig(i), [field]: value },
-    }))
+  function setRowField(i: number, field: keyof RowConfig, value: string | boolean | null) {
+    setRowConfigs((prev) => {
+      const current = getRowConfig(i)
+      const next = { ...current, [field]: value }
+      // Edição manual de BU/categoria desvincula da regra (decisão do usuário prevalece)
+      if ((field === "business_unit_id" || field === "category_id") && current.cost_rule_id) {
+        next.cost_rule_id = null
+      }
+      return { ...prev, [i]: next }
+    })
   }
 
   function applyGlobalToAll() {
@@ -255,8 +283,9 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
           transaction_date: t.date,
           competence_date: t.date.slice(0, 7) + "-01",
           fitid: t.fitid || null,
+          cost_rule_id: cfg.cost_rule_id,
           notes: `Importado via OFX | FITID: ${t.fitid}`,
-        } as const
+        }
       })
       .filter(Boolean)
 
@@ -281,6 +310,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
 
   const total = parsed?.transactions.length ?? 0
   const skipped = Object.values(rowConfigs).filter((c) => c.skip).length
+  const autoClassified = Object.values(rowConfigs).filter((c) => !c.skip && c.cost_rule_id).length
   const readyToImport = parsed?.transactions.filter((_, i) => {
     const cfg = getRowConfig(i)
     if (cfg.skip) return false
@@ -300,13 +330,13 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
   if (step === 3) {
     return (
       <div className="flex flex-col items-center justify-center py-28 gap-5">
-        <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center">
-          <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+        <div className="w-16 h-16 rounded-full bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center dark:bg-emerald-950/40 dark:border-emerald-800">
+          <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
         </div>
         <div className="text-center">
           <h2 className="text-xl font-semibold">{importedCount} transações importadas</h2>
           {skippedCount > 0 && (
-            <p className="text-xs text-amber-600 mt-1">
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
               {skippedCount} ignoradas por já existirem (mesmo FITID + banco)
             </p>
           )}
@@ -435,12 +465,12 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
           <div className="space-y-1.5 w-44">
             <label className="text-xs font-medium flex items-center gap-1">
               Conta bancária
-              <span className="text-rose-500">*</span>
+              <span className="text-rose-500 dark:text-rose-400">*</span>
             </label>
             <Select value={globalBank} onValueChange={(v) => setGlobalBank(v ?? "")}>
               <SelectTrigger className={cn(
                 "transition-all",
-                globalBank ? "border-emerald-300 bg-emerald-50" : ""
+                globalBank ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40" : ""
               )}>
                 <SelectValue>
                   {(v: string) => bankAccounts.find(b => b.id === v)?.bank_name ?? "Selecionar banco..."}
@@ -460,7 +490,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
             <Select value={globalBu} onValueChange={(v) => setGlobalBu(v ?? "")}>
               <SelectTrigger className={cn(
                 "transition-all",
-                globalBu ? "border-emerald-300 bg-emerald-50" : ""
+                globalBu ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/40" : ""
               )}>
                 <SelectValue>
                   {(v: string) => businessUnits.find(bu => bu.id === v)?.name ?? "Selecionar BU..."}
@@ -487,7 +517,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
             <Button
               size="sm"
               variant="outline"
-              className="text-amber-700 border-amber-200 hover:bg-amber-50 hover:border-amber-300"
+              className="text-amber-700 border-amber-200 hover:bg-amber-50 hover:border-amber-300 dark:text-amber-300 dark:border-amber-900 dark:hover:bg-amber-950/40 dark:hover:border-amber-800"
               onClick={applyOutrasDespesasToAll}
             >
               Marcar todas como Outras despesas
@@ -497,12 +527,21 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
       </div>
 
       {/* Contadores */}
-      <div className="flex items-center gap-3 text-sm px-0.5">
+      <div className="flex items-center gap-3 text-sm px-0.5 flex-wrap">
         <span className="text-muted-foreground">{total} transações</span>
         <span className="text-muted-foreground">·</span>
-        <span className={cn("font-medium", readyToImport > 0 ? "text-emerald-600" : "text-muted-foreground")}>
+        <span className={cn("font-medium", readyToImport > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
           {readyToImport} prontas
         </span>
+        {autoClassified > 0 && (
+          <>
+            <span className="text-muted-foreground">·</span>
+            <span className="font-medium text-violet-600 dark:text-violet-300 inline-flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              {autoClassified} auto-classificadas
+            </span>
+          </>
+        )}
         {skipped > 0 && (
           <>
             <span className="text-muted-foreground">·</span>
@@ -512,7 +551,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
         {total - skipped - readyToImport > 0 && (
           <>
             <span className="text-muted-foreground">·</span>
-            <span className="text-amber-600 font-medium">{total - skipped - readyToImport} incompletas</span>
+            <span className="text-amber-600 dark:text-amber-400 font-medium">{total - skipped - readyToImport} incompletas</span>
           </>
         )}
       </div>
@@ -547,7 +586,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
                       cfg.skip
                         ? "opacity-35 bg-muted/20"
                         : isReady
-                          ? "hover:bg-emerald-50/40"
+                          ? "hover:bg-emerald-50/40 dark:hover:bg-emerald-950/20"
                           : "hover:bg-muted/30"
                     )}
                   >
@@ -561,9 +600,9 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
                         {cfg.skip ? (
                           <Minus className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : isReady ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
                         ) : (
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 border-dashed" />
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 dark:border-amber-500 border-dashed" />
                         )}
                       </button>
                     </td>
@@ -575,16 +614,27 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
 
                     {/* Descrição */}
                     <td className="px-3 py-2">
-                      <p className="text-sm truncate max-w-[280px]" title={t.memo}>
-                        {t.memo || <span className="text-muted-foreground italic">sem descrição</span>}
-                      </p>
+                      <div className="flex items-center gap-1.5 max-w-[280px]">
+                        <p className="text-sm truncate" title={t.memo}>
+                          {t.memo || <span className="text-muted-foreground italic">sem descrição</span>}
+                        </p>
+                        {cfg.cost_rule_id && !cfg.skip && (
+                          <span
+                            title="Classificado automaticamente por uma regra da Central de Custo"
+                            className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300"
+                          >
+                            <Sparkles className="h-2.5 w-2.5" />
+                            Auto
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Valor */}
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       <span className={cn(
                         "font-mono font-medium text-sm",
-                        isEntrada ? "text-emerald-600" : "text-rose-600"
+                        isEntrada ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
                       )}>
                         {isEntrada ? "+" : "−"}{formatCurrency(Math.abs(t.amount))}
                       </span>
@@ -626,7 +676,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
 
       {/* Erro */}
       {importError && (
-        <div className="flex items-center gap-2 text-sm text-rose-600 border border-rose-200 bg-rose-50 rounded-lg px-3 py-2.5">
+        <div className="flex items-center gap-2 text-sm text-rose-600 border border-rose-200 bg-rose-50 rounded-lg px-3 py-2.5 dark:text-rose-300 dark:border-rose-900 dark:bg-rose-950/40">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {importError}
         </div>

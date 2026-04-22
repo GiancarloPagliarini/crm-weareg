@@ -65,6 +65,7 @@ export type Transaction = {
   receipt_url: string | null
   notes: string | null
   fitid: string | null
+  cost_rule_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -72,6 +73,22 @@ export type Transaction = {
   business_units?: BusinessUnit
   transaction_categories?: TransactionCategory
   bank_accounts?: BankAccount
+}
+
+export type CostFrequency = 'diario' | 'semanal' | 'quinzenal' | 'mensal' | 'anual'
+
+export type CostRule = {
+  id: string
+  match_text: string
+  business_unit_id: string
+  category_id: string
+  frequency: CostFrequency
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // joins
+  business_units?: BusinessUnit
+  transaction_categories?: TransactionCategory
 }
 
 export type Receivable = {

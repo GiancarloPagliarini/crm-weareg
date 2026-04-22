@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { currentMonthRange, formatCurrency, formatPercent } from "@/lib/formatters"
+import { TRACKING_START_DATE } from "@/lib/constants"
 import type { BankBalance, DashboardKpis, BusinessUnit } from "@/lib/types"
 import { KpiCard } from "@/components/financeiro/kpi-card"
 import { BankCard } from "@/components/financeiro/bank-card"
@@ -33,7 +34,8 @@ export default async function DashboardPage() {
     supabase
       .from("receivables")
       .select("amount")
-      .eq("status", "pendente"),
+      .eq("status", "pendente")
+      .gte("created_at", TRACKING_START_DATE),
   ])
 
   const kpis: DashboardKpis = kpisRaw ?? {

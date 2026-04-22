@@ -108,14 +108,18 @@ function KpiCard({
         <p className={cn(
           "font-bold tabular-nums leading-none",
           highlight ? "text-xl" : "text-lg",
-          isPos ? "text-emerald-600" : isNeg ? "text-rose-600" : "text-foreground"
+          isPos ? "text-emerald-600 dark:text-emerald-400"
+            : isNeg ? "text-rose-600 dark:text-rose-400"
+            : "text-foreground"
         )}>
           {formatCurrency(value)}
         </p>
         {margin !== undefined && (
           <p className={cn(
             "text-xs font-medium mt-1.5",
-            margin >= 30 ? "text-emerald-600" : margin >= 10 ? "text-amber-600" : "text-rose-600"
+            margin >= 30 ? "text-emerald-600 dark:text-emerald-400"
+              : margin >= 10 ? "text-amber-600 dark:text-amber-400"
+              : "text-rose-600 dark:text-rose-400"
           )}>
             Margem {formatPercent(margin)}
           </p>
@@ -148,8 +152,8 @@ function Line({
       indent && "pl-4",
       subtotal && "py-2.5 px-3 bg-muted/40 rounded-lg",
       total && "py-3 px-3 rounded-lg",
-      total && value > 0 && "bg-emerald-50",
-      total && value <= 0 && "bg-rose-50",
+      total && value > 0 && "bg-emerald-50 dark:bg-emerald-950/40",
+      total && value <= 0 && "bg-rose-50 dark:bg-rose-950/40",
     )}>
       <div className="flex items-center gap-2 min-w-0">
         <span className={cn(
@@ -163,9 +167,9 @@ function Line({
         {margin !== undefined && (
           <span className={cn(
             "text-[11px] font-semibold px-1.5 py-0.5 rounded-full shrink-0",
-            margin >= 30 ? "bg-emerald-100 text-emerald-700"
-            : margin >= 10 ? "bg-amber-100 text-amber-700"
-            : "bg-rose-100 text-rose-700"
+            margin >= 30 ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+            : margin >= 10 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+            : "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"
           )}>
             {formatPercent(margin)}
           </span>
@@ -175,11 +179,11 @@ function Line({
       <span className={cn(
         "font-mono tabular-nums shrink-0",
         !total && "text-sm",
-        indent   && value < 0 && "text-rose-600",
+        indent   && value < 0 && "text-rose-600 dark:text-rose-400",
         subtotal && "font-medium text-sm",
         total    && "font-bold text-base",
-        total    && value > 0 && "text-emerald-700",
-        total    && value <= 0 && "text-rose-700",
+        total    && value > 0 && "text-emerald-700 dark:text-emerald-300",
+        total    && value <= 0 && "text-rose-700 dark:text-rose-300",
       )}>
         {formatCurrency(value)}
       </span>
