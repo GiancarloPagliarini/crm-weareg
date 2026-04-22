@@ -64,6 +64,7 @@ export type Transaction = {
   is_reconciled: boolean
   receipt_url: string | null
   notes: string | null
+  fitid: string | null
   created_by: string | null
   created_at: string
   updated_at: string

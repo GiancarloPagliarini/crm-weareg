@@ -162,6 +162,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
   const [importing, setImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [importedCount, setImportedCount] = useState(0)
+  const [skippedCount, setSkippedCount] = useState(0)
 
   function handleSelectInstitution(inst: Institution) {
     setInstitution(inst)
@@ -253,6 +254,7 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
           description: t.memo || `OFX ${t.fitid}`,
           transaction_date: t.date,
           competence_date: t.date.slice(0, 7) + "-01",
+          fitid: t.fitid || null,
           notes: `Importado via OFX | FITID: ${t.fitid}`,
         } as const
       })
@@ -272,7 +274,8 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
     const data = await res.json()
     setImporting(false)
     if (!res.ok) { setImportError(data.error ?? "Erro ao importar."); return }
-    setImportedCount(data.imported)
+    setImportedCount(data.imported ?? 0)
+    setSkippedCount(data.skipped ?? 0)
     setStep(3)
   }
 
@@ -302,10 +305,15 @@ export function OFXImportClient({ businessUnits, categories, bankAccounts }: Pro
         </div>
         <div className="text-center">
           <h2 className="text-xl font-semibold">{importedCount} transações importadas</h2>
+          {skippedCount > 0 && (
+            <p className="text-xs text-amber-600 mt-1">
+              {skippedCount} ignoradas por já existirem (mesmo FITID + banco)
+            </p>
+          )}
           <p className="text-sm text-muted-foreground mt-1">Lançamentos disponíveis na aba Lançamentos.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setStep(1); setParsed(null); setFileName(""); setInstitution(null); setGlobalBank("") }}>
+          <Button variant="outline" onClick={() => { setStep(1); setParsed(null); setFileName(""); setInstitution(null); setGlobalBank(""); setSkippedCount(0) }}>
             Importar outro arquivo
           </Button>
           <Button onClick={() => startTransition(() => router.push("/financeiro/lancamentos"))}>
