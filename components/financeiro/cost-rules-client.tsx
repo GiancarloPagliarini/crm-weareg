@@ -17,8 +17,16 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CostRuleDialog } from "./cost-rule-dialog"
-import { ArrowLeft, Plus, Pencil, Trash2 } from "lucide-react"
+import { ArrowLeft, Plus, Pencil, Trash2, Search } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -57,10 +65,46 @@ export function CostRulesClient({ bu, initialRules, categories }: Props) {
   const [, startTransition] = useTransition()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<CostRuleRow | null>(null)
+  const [search, setSearch] = useState("")
+  const [filterFreq, setFilterFreq] = useState<string>("all")
+  const [filterCategory, setFilterCategory] = useState<string>("all")
+  const [sortBy, setSortBy] = useState<string>("match_text")
 
-  const totalMensal = initialRules.reduce((acc, r) => {
+  const filtered = initialRules
+    .filter((r) => {
+      const term = search.toLowerCase()
+      const matchSearch =
+        !term ||
+        r.match_text.toLowerCase().includes(term) ||
+        (r.transaction_categories?.name.toLowerCase().includes(term) ?? false)
+      const matchFreq = filterFreq === "all" || r.frequency === filterFreq
+      const matchCat  = filterCategory === "all" || r.category_id === filterCategory
+      return matchSearch && matchFreq && matchCat
+    })
+    .sort((a, b) => {
+      if (sortBy === "monthly_desc") {
+        const ma = Number(a.last_amount ?? 0) * toMonthly[a.frequency]
+        const mb = Number(b.last_amount ?? 0) * toMonthly[b.frequency]
+        return mb - ma
+      }
+      if (sortBy === "last_date_desc") {
+        return (b.last_date ?? "").localeCompare(a.last_date ?? "")
+      }
+      return a.match_text.localeCompare(b.match_text)
+    })
+
+  const totalMensal = filtered.reduce((acc, r) => {
     return acc + Number(r.last_amount ?? 0) * toMonthly[r.frequency]
   }, 0)
+
+  const isFiltered =
+    search !== "" || filterFreq !== "all" || filterCategory !== "all"
+
+  function clearFilters() {
+    setSearch("")
+    setFilterFreq("all")
+    setFilterCategory("all")
+  }
 
   async function handleDelete(id: string) {
     if (!confirm("Excluir essa regra? As transações já classificadas continuam, mas novas importações não serão mais auto-classificadas por ela.")) return
@@ -93,7 +137,16 @@ export function CostRulesClient({ bu, initialRules, categories }: Props) {
           </Link>
           <h1 className="text-2xl font-semibold">{bu.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {initialRules.length} {initialRules.length === 1 ? "regra ativa" : "regras ativas"}
+            {isFiltered ? (
+              <>
+                <span className="font-medium text-foreground">{filtered.length}</span> de {initialRules.length}{" "}
+                {initialRules.length === 1 ? "regra" : "regras"}
+              </>
+            ) : (
+              <>
+                {initialRules.length} {initialRules.length === 1 ? "regra ativa" : "regras ativas"}
+              </>
+            )}
           </p>
         </div>
 
@@ -126,10 +179,81 @@ export function CostRulesClient({ bu, initialRules, categories }: Props) {
             </div>
           </div>
           <p className="text-xs text-muted-foreground mt-3">
-            Soma das regras ativas normalizadas. Baseado no último lançamento de cada regra.
+            {isFiltered
+              ? "Soma das regras visíveis no filtro atual, normalizadas pelo último lançamento."
+              : "Soma das regras ativas normalizadas. Baseado no último lançamento de cada regra."}
           </p>
         </CardContent>
       </Card>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 p-3 bg-muted/30 rounded-lg border border-border/60">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar match ou categoria..."
+            className="pl-8 bg-background"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={filterFreq} onValueChange={(v) => setFilterFreq(v ?? "all")}>
+          <SelectTrigger className="w-40 bg-background">
+            <SelectValue>
+              {(v: string) => v === "all" ? "Todas frequências" : freqLabels[v as CostFrequency]}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas frequências</SelectItem>
+            <SelectItem value="diario">Diário</SelectItem>
+            <SelectItem value="semanal">Semanal</SelectItem>
+            <SelectItem value="quinzenal">Quinzenal</SelectItem>
+            <SelectItem value="mensal">Mensal</SelectItem>
+            <SelectItem value="anual">Anual</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v ?? "all")}>
+          <SelectTrigger className="w-48 bg-background">
+            <SelectValue>
+              {(v: string) => v === "all"
+                ? "Todas categorias"
+                : (categories.find(c => c.id === v)?.name ?? "Categoria")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas categorias</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v ?? "match_text")}>
+          <SelectTrigger className="w-44 bg-background">
+            <SelectValue>
+              {(v: string) => ({
+                match_text: "Ordem: Match (A–Z)",
+                monthly_desc: "Ordem: Mensal (maior)",
+                last_date_desc: "Ordem: Último lançam.",
+              }[v] ?? "Ordem")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="match_text">Match (A–Z)</SelectItem>
+            <SelectItem value="monthly_desc">Mensal (maior)</SelectItem>
+            <SelectItem value="last_date_desc">Último lançamento</SelectItem>
+          </SelectContent>
+        </Select>
+        {isFiltered && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Limpar filtros
+          </Button>
+        )}
+      </div>
 
       {/* Tabela */}
       <div className="border rounded-lg overflow-hidden">
@@ -145,15 +269,19 @@ export function CostRulesClient({ bu, initialRules, categories }: Props) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {initialRules.length === 0 && (
+            {filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="py-16 text-center text-sm text-muted-foreground">
-                  Nenhuma regra cadastrada ainda. Clique em <span className="font-medium text-foreground">Nova regra</span> para começar.
+                  {initialRules.length === 0 ? (
+                    <>Nenhuma regra cadastrada ainda. Clique em <span className="font-medium text-foreground">Nova regra</span> para começar.</>
+                  ) : (
+                    <>Nenhuma regra corresponde aos filtros aplicados.</>
+                  )}
                 </TableCell>
               </TableRow>
             )}
 
-            {initialRules.map((rule) => {
+            {filtered.map((rule) => {
               const last = Number(rule.last_amount ?? 0)
               const monthly = last * toMonthly[rule.frequency]
               return (

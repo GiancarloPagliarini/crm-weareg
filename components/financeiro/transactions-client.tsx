@@ -22,10 +22,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TransactionDialog } from "./transaction-dialog"
+import { DateRangeFilter } from "./date-range-filter"
 import { Plus, Search, CheckCircle2, Circle, Trash2, CheckCheck, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import { format } from "date-fns"
+import type { DateRange } from "react-day-picker"
 
 type Props = {
   initialTransactions: Transaction[]
@@ -45,10 +48,18 @@ export function TransactionsClient({
   const [search, setSearch] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
   const [filterBu, setFilterBu] = useState<string>("all")
+  const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+
+  const dateFrom = dateRange?.from ? format(dateRange.from, "yyyy-MM-dd") : null
+  const dateTo   = dateRange?.to
+    ? format(dateRange.to, "yyyy-MM-dd")
+    : dateRange?.from
+      ? format(dateRange.from, "yyyy-MM-dd")
+      : null
 
   const filtered = initialTransactions.filter((t) => {
     const matchSearch =
@@ -57,7 +68,10 @@ export function TransactionsClient({
       (t.counterpart_name?.toLowerCase().includes(search.toLowerCase()) ?? false)
     const matchType = filterType === "all" || t.type === filterType
     const matchBu = filterBu === "all" || t.business_unit_id === filterBu
-    return matchSearch && matchType && matchBu
+    const matchDate =
+      !dateFrom ||
+      (t.transaction_date >= dateFrom && t.transaction_date <= (dateTo ?? dateFrom))
+    return matchSearch && matchType && matchBu && matchDate
   })
 
   const totalEntradas = filtered.filter(t => t.type === "entrada").reduce((s, t) => s + t.amount, 0)
@@ -197,6 +211,7 @@ export function TransactionsClient({
             ))}
           </SelectContent>
         </Select>
+        <DateRangeFilter value={dateRange} onChange={setDateRange} className="min-w-56" />
       </div>
 
       {/* Barra de ações em bulk */}
