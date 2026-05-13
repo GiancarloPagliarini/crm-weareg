@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { formatCurrency, formatPercent } from "@/lib/formatters"
 import type { BusinessUnit, DashboardKpis } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { MaskedValue } from "@/components/financeiro/masked-value"
 
 type Props = {
   bu: BusinessUnit
@@ -38,7 +39,7 @@ export function BuCard({ bu, kpis }: Props) {
             Faturamento
           </p>
           <p className="text-lg font-bold tabular-nums leading-none">
-            {formatCurrency(kpis?.faturamento ?? 0)}
+            <MaskedValue value={formatCurrency(kpis?.faturamento ?? 0)} />
           </p>
         </div>
 
@@ -51,7 +52,7 @@ export function BuCard({ bu, kpis }: Props) {
               "text-sm font-bold tabular-nums",
               isPos ? "text-emerald-600" : isNeg ? "text-rose-600" : "text-foreground"
             )}>
-              {formatCurrency(lucro)}
+              <MaskedValue value={formatCurrency(lucro)} />
             </p>
           </div>
           <div className="text-right">
@@ -64,7 +65,7 @@ export function BuCard({ bu, kpis }: Props) {
               : margem >= 5  ? "text-amber-600"
               : "text-rose-600"
             )}>
-              {formatPercent(margem)}
+              <MaskedValue value={formatPercent(margem)} />
             </p>
           </div>
         </div>

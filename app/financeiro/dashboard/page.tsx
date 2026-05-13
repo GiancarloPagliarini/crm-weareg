@@ -6,6 +6,8 @@ import { KpiCard } from "@/components/financeiro/kpi-card"
 import { BankCard } from "@/components/financeiro/bank-card"
 import { BuCard } from "@/components/financeiro/bu-card"
 import { DashboardFilters } from "@/components/financeiro/dashboard-filters"
+import { PrivacyProvider } from "@/hooks/use-privacy-mode"
+import { PrivacyToggle } from "@/components/financeiro/privacy-toggle"
 import {
   TrendingUp,
   TrendingDown,
@@ -106,13 +108,17 @@ export default async function DashboardPage({
   })()
 
   return (
+    <PrivacyProvider>
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {selectedBu ? `${selectedBu.name} — ` : "Visão consolidada — "}
-          {periodLabel}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {selectedBu ? `${selectedBu.name} — ` : "Visão consolidada — "}
+            {periodLabel}
+          </p>
+        </div>
+        <PrivacyToggle />
       </div>
 
       <DashboardFilters
@@ -189,5 +195,6 @@ export default async function DashboardPage({
         </div>
       )}
     </div>
+    </PrivacyProvider>
   )
 }

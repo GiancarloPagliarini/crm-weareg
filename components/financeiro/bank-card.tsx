@@ -3,6 +3,7 @@ import { formatCurrency } from "@/lib/formatters"
 import type { BankBalance } from "@/lib/types"
 import { Landmark } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { MaskedValue } from "@/components/financeiro/masked-value"
 
 type Props = { bank: BankBalance }
 
@@ -24,7 +25,7 @@ export function BankCard({ bank }: Props) {
           "text-2xl font-bold tabular-nums leading-none",
           !isPos && "text-rose-600"
         )}>
-          {formatCurrency(bank.current_balance)}
+          <MaskedValue value={formatCurrency(bank.current_balance)} />
         </p>
 
         <div className="flex gap-5 mt-3 pt-3 border-t border-border/60 text-xs">
@@ -32,14 +33,14 @@ export function BankCard({ bank }: Props) {
             <span className="font-bold text-emerald-500">↑</span>
             <span className="text-muted-foreground">Entradas</span>
             <span className="font-semibold text-emerald-600 tabular-nums">
-              {formatCurrency(bank.total_entradas)}
+              <MaskedValue value={formatCurrency(bank.total_entradas)} />
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-rose-500">↓</span>
             <span className="text-muted-foreground">Saídas</span>
             <span className="font-semibold text-rose-600 tabular-nums">
-              {formatCurrency(bank.total_saidas)}
+              <MaskedValue value={formatCurrency(bank.total_saidas)} />
             </span>
           </div>
         </div>

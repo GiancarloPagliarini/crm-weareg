@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { MaskedValue } from "@/components/financeiro/masked-value"
 
 type Props = {
   label: string
@@ -31,7 +32,7 @@ export function KpiCard({ label, value, icon: Icon, sub, subValue, highlight }: 
               highlight === "positive" && "text-emerald-600",
               highlight === "negative" && "text-rose-600"
             )}>
-              {value}
+              <MaskedValue value={value} />
             </p>
             {sub && (
               <p className={cn(
@@ -42,7 +43,7 @@ export function KpiCard({ label, value, icon: Icon, sub, subValue, highlight }: 
                     : "text-rose-600"
                   : "text-muted-foreground"
               )}>
-                {sub}
+                <MaskedValue value={sub} />
               </p>
             )}
           </div>
