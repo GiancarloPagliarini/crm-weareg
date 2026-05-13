@@ -48,7 +48,7 @@ export default function LoginPage() {
             width={420}
             height={120}
             priority
-            className="h-10 w-auto xl:h-11"
+            className="h-14 w-auto xl:h-16"
           />
         </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
             alt="WeAreG"
             width={320}
             height={92}
-            className="h-8 w-auto"
+            className="h-12 w-auto"
           />
         </div>
 
