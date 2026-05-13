@@ -2,7 +2,7 @@
 
 import { usePrivacyMode } from "@/hooks/use-privacy-mode"
 
-function maskDigits(input: string, visible = 2): string {
+function maskDigits(input: string, visible = 0): string {
   let seen = 0
   return input.replace(/\d/g, (digit) => {
     if (seen < visible) {
@@ -19,7 +19,7 @@ type Props = {
   className?: string
 }
 
-export function MaskedValue({ value, visible = 2, className }: Props) {
+export function MaskedValue({ value, visible = 0, className }: Props) {
   const { hidden } = usePrivacyMode()
   return (
     <span className={className} aria-label={hidden ? "valor oculto" : undefined}>

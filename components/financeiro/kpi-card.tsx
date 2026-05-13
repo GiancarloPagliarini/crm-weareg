@@ -10,9 +10,10 @@ type Props = {
   sub?: string
   subValue?: number
   highlight?: "positive" | "negative"
+  noMask?: boolean
 }
 
-export function KpiCard({ label, value, icon: Icon, sub, subValue, highlight }: Props) {
+export function KpiCard({ label, value, icon: Icon, sub, subValue, highlight, noMask }: Props) {
   return (
     <Card className="overflow-hidden py-0 gap-0">
       {highlight && (
@@ -32,7 +33,7 @@ export function KpiCard({ label, value, icon: Icon, sub, subValue, highlight }: 
               highlight === "positive" && "text-emerald-600",
               highlight === "negative" && "text-rose-600"
             )}>
-              <MaskedValue value={value} />
+              {noMask ? value : <MaskedValue value={value} />}
             </p>
             {sub && (
               <p className={cn(

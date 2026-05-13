@@ -25,7 +25,7 @@ export function BankCard({ bank }: Props) {
           "text-2xl font-bold tabular-nums leading-none",
           !isPos && "text-rose-600"
         )}>
-          <MaskedValue value={formatCurrency(bank.current_balance)} />
+          {formatCurrency(bank.current_balance)}
         </p>
 
         <div className="flex gap-5 mt-3 pt-3 border-t border-border/60 text-xs">

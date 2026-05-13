@@ -131,6 +131,7 @@ export default async function DashboardPage({
           label="Saldo total"
           value={formatCurrency(totalSaldo)}
           icon={Landmark}
+          noMask
         />
         <KpiCard
           label="Faturamento"
