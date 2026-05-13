@@ -18,10 +18,12 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-  const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+  const { pathname } = request.nextUrl
+  const isLoginPage = pathname.startsWith('/login')
+  const isPublicPage = isLoginPage || pathname.startsWith('/signup')
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    return isLoginPage
+    return isPublicPage
       ? supabaseResponse
       : NextResponse.redirect(new URL('/login', request.url))
   }
@@ -49,12 +51,12 @@ export async function middleware(request: NextRequest) {
     user = result.data.user
   } catch (err) {
     console.error('[middleware] auth check failed:', err)
-    return isLoginPage
+    return isPublicPage
       ? supabaseResponse
       : NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (!user && !isLoginPage) {
+  if (!user && !isPublicPage) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
